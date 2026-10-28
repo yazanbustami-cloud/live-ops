@@ -80,10 +80,11 @@ h3{font-size:15px;font-weight:700;margin:0}
 .hero .label{font-size:14px;font-weight:600;opacity:.9}
 .hero .big{font-size:clamp(48px,6vw,76px);font-weight:800;line-height:1;letter-spacing:-.03em;margin-top:6px}
 .hero .asof{font-size:12px;opacity:.75;margin-top:6px}
-.cmp{display:grid;grid-template-columns:auto 1fr auto;gap:8px 12px;align-items:baseline;font-size:13px}
+.cmp{display:grid;grid-template-columns:auto 1fr auto auto;gap:8px 12px;align-items:baseline;font-size:13px}
+.cmp .a{font-weight:700;text-align:right;min-width:64px}
 .cmp span:first-child{opacity:.8}
 .cmp .n{font-weight:600;text-align:right}
-.cmp .d{font-weight:700;text-align:right;min-width:74px}
+.cmp .d{font-weight:700;text-align:right;min-width:58px}
 .hero .up{color:#7CE59B}.hero .down{color:#FFB3A8}
 .hero.empty .msg{background:var(--blue);color:#F9F9F9}
 .tiles{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:16px}
@@ -517,7 +518,7 @@ function renderHero(){
     document.getElementById('heroAsOf').textContent = h != null ? `As of ${String(h).padStart(2, '0')}:${mm ? mm[1] : '00'} Amman time` : '';
     const line = (label, f) => {
       const prev = get(f), d = today - prev, p = pctChange(today, prev);
-      return `<span>${label}</span><span class="n">${fInt(prev)}</span><span class="d ${cls(d)}">${fSign(p, 1)}%</span>`;
+      return `<span>${label}</span><span class="n">${fInt(prev)}</span><span class="a ${cls(d)}">${fSign(d)}</span><span class="d ${cls(d)}">${fSign(p, 1)}%</span>`;
     };
     document.getElementById('heroCmp').innerHTML =
       line('Yesterday', 'yesterday_trips') + line('Last week', 'last_week_trips') + line('Two weeks ago', 'two_weeks_ago_trips');
