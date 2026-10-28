@@ -1,7 +1,6 @@
 const ALLOWED = new Set([
   '6f1b308f-112c-4690-8fab-486bd6e5abcd',
   '76006360-1bf6-4c73-ae7d-986c6fcb7be7',
-  '6f4568f4-dad3-4691-bebd-a90a0e7b06bb',
   '9841cb62-3e42-4c5d-acdd-ed6b3da1d3f3',
   '44bd6515-814a-49fb-a0ce-ce169587fe79',
   '2145aa50-a36e-402f-8f18-51e54fd329e2',
@@ -10,7 +9,6 @@ const ALLOWED = new Set([
   'c8ae5479-db8e-499c-84a4-29d3bcf73745',
   '7d9b3c18-3be0-4862-afed-c85307f62673',
   'ea279495-ea79-4802-a43c-7cfec8350eb5',
-  '6faf1714-c51a-4de5-84e6-ece9929d7ba8',
   '9126c381-ae08-4f31-bc4a-cb97ab65aa33',
   'bc7eb357-8b8b-4ea2-ba72-d47134cf8a42'
 ]);
