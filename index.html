@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Petra Ride — Live Operations</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;0,800;1,600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<style>
+:root{
+  --blue:#043CA1; --orange:#EC7C01; --green:#1C8E1C; --red:#C70010;
+  --today:#043CA1; --lastweek:#ABA9BC; --soft-blue:#C9D6EF;
+  --bg:#F3F4F8; --surface:#FFFFFF; --ink:#292935; --ink-2:#464555; --muted:#6F6D82; --line:#E3E2E9;
+  --good-bg:#E4F3E4; --bad-bg:#FBE3E5; --warn-bg:#FDF0E0;
+  color-scheme: light;
+  font-family: Montserrat, "Segoe UI", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --today:#4B8DF8; --lastweek:#7E7C92; --soft-blue:#2B3D66;
+    --bg:#1B1B23; --surface:#292935; --ink:#F9F9F9; --ink-2:#D3D2DE; --muted:#A3A1B6; --line:#3B3A4A;
+    --green:#4CC24C; --red:#FF6370; --orange:#FF9A2E;
+    --good-bg:#1F3A23; --bad-bg:#4A2129; --warn-bg:#4A3517;
+    color-scheme: dark;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font-size:14px;line-height:1.45;padding-bottom:env(safe-area-inset-bottom,0px)}
+a{color:inherit}
+
+/* Header */
+.top{position:sticky;top:0;z-index:20;background:var(--blue);color:#F9F9F9;padding-top:env(safe-area-inset-top,0px)}
+.top-in{max-width:1440px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.brand{font-weight:600;font-style:italic;font-size:20px;letter-spacing:-.01em;white-space:nowrap}
+.title{font-weight:500;font-size:15px;opacity:.85;padding-left:16px;border-left:1px solid rgba(249,249,249,.3)}
+.live{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:13px}
+.dot{width:8px;height:8px;border-radius:50%;background:#4CE07A;box-shadow:0 0 0 0 rgba(76,224,122,.6);animation:pulse 2s infinite}
+.dot.err{background:var(--orange);animation:none}
+@keyframes pulse{70%{box-shadow:0 0 0 8px rgba(76,224,122,0)}100%{box-shadow:0 0 0 0 rgba(76,224,122,0)}}
+.spacer{flex:1}
+.clock{text-align:right;font-size:12px;opacity:.9;line-height:1.3}
+.clock b{display:block;font-size:20px;font-weight:700;opacity:1;letter-spacing:.01em}
+.btn{font:inherit;font-weight:600;font-size:13px;border:1px solid rgba(249,249,249,.45);background:transparent;color:#F9F9F9;border-radius:8px;padding:8px 14px;cursor:pointer}
+.btn:hover{background:rgba(249,249,249,.12)}
+.btn:focus-visible,.seg button:focus-visible,select:focus-visible,.chk:focus-within{outline:2px solid var(--orange);outline-offset:2px}
+.btn[disabled]{opacity:.6;cursor:wait}
+.progress{height:3px;background:rgba(249,249,249,.15)}
+.progress i{display:block;height:100%;width:0;background:var(--orange);transition:width 1s linear}
+nav.sections{max-width:1440px;margin:0 auto;padding:0 24px;display:flex;gap:4px;overflow-x:auto}
+nav.sections a{color:#F9F9F9;opacity:.75;text-decoration:none;font-size:13px;font-weight:600;padding:8px 12px 10px;border-bottom:2px solid transparent;white-space:nowrap}
+nav.sections a:hover{opacity:1;border-bottom-color:var(--orange)}
+
+main{max-width:1440px;margin:0 auto;padding:8px 24px 40px}
+section{scroll-margin-top:120px;margin-top:28px}
+h2{font-size:20px;font-weight:800;margin:0 0 4px;letter-spacing:-.01em}
+.lede{color:var(--muted);margin:0 0 14px;font-size:13px}
+h3{font-size:15px;font-weight:700;margin:0}
+.sub{color:var(--muted);font-size:12px;margin:2px 0 0}
+
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.span2{grid-column:span 2}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;position:relative;min-width:0}
+.card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
+.chart{position:relative;height:280px}
+.chart.tall{height:340px}
+.msg{position:absolute;inset:48px 16px 16px;display:none;align-items:center;justify-content:center;text-align:center;color:var(--muted);font-size:13px;background:var(--surface);z-index:2}
+.card.empty .msg{display:flex}
+.stale{display:none;font-size:11px;font-weight:600;color:var(--orange);margin-left:8px}
+.card.is-stale .stale{display:inline}
+
+/* Today */
+.today{display:grid;grid-template-columns:minmax(300px,1.1fr) 2fr;gap:16px}
+.hero{background:var(--blue);color:#F9F9F9;border:0;display:flex;flex-direction:column;justify-content:space-between;gap:18px;padding:22px 24px}
+.hero .label{font-size:14px;font-weight:600;opacity:.9}
+.hero .big{font-size:clamp(48px,6vw,76px);font-weight:800;line-height:1;letter-spacing:-.03em;margin-top:6px}
+.hero .asof{font-size:12px;opacity:.75;margin-top:6px}
+.cmp{display:grid;grid-template-columns:auto 1fr auto;gap:8px 12px;align-items:baseline;font-size:13px}
+.cmp span:first-child{opacity:.8}
+.cmp .n{font-weight:600;text-align:right}
+.cmp .d{font-weight:700;text-align:right;min-width:74px}
+.hero .up{color:#7CE59B}.hero .down{color:#FFB3A8}
+.hero.empty .msg{background:var(--blue);color:#F9F9F9}
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.tile .k{font-size:12px;font-weight:600;color:var(--muted)}
+.tile .v{font-size:28px;font-weight:800;letter-spacing:-.02em;margin:4px 0 6px}
+.tile .v small{font-size:14px;font-weight:600;color:var(--muted);margin-left:4px}
+.tile .l{font-size:12px;color:var(--ink-2);margin:0}
+.tile .msg{inset:12px}
+.up{color:var(--green)}.down{color:var(--red)}.flat{color:var(--muted)}
+
+/* Controls */
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;flex-shrink:0}
+.seg button{font:inherit;font-size:12px;font-weight:600;border:0;background:transparent;color:var(--muted);padding:6px 10px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--today);color:#fff}
+select{font:inherit;font-size:12px;font-weight:600;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+.chk{font-size:12px;font-weight:600;color:var(--muted);display:inline-flex;gap:6px;align-items:center;white-space:nowrap}
+
+/* Tables */
+.tbl-wrap{overflow-x:auto;margin:0 -4px}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+th{text-align:right;font-size:11px;font-weight:700;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{text-align:right;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child,th.l,td.l{text-align:left}
+tr.total td{font-weight:800;background:color-mix(in srgb,var(--today) 7%,transparent)}
+tbody tr:hover td{background:color-mix(in srgb,var(--today) 5%,transparent)}
+.bar{display:inline-block;height:6px;border-radius:3px;background:var(--today);vertical-align:middle;margin-right:8px;opacity:.75}
+.pill{display:inline-block;min-width:52px;padding:2px 8px;border-radius:999px;font-weight:700;font-size:12px;text-align:center}
+.pill.good{background:var(--good-bg);color:var(--green)}
+.pill.warn{background:var(--warn-bg);color:var(--orange)}
+.pill.bad{background:var(--bad-bg);color:var(--red)}
+.heat{border-radius:4px}
+.muted{color:var(--muted)}
+.legend-note{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:8px}
+.legend-note i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+
+footer{max-width:1440px;margin:0 auto;padding:0 24px 32px;color:var(--muted);font-size:12px}
+footer details summary{cursor:pointer;font-weight:600}
+footer ul{columns:2;padding-left:18px}
+footer li.bad{color:var(--red)}
+
+@media (max-width:1100px){
+  .today{grid-template-columns:1fr}
+  .g3{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:760px){
+  .top-in{padding:12px 16px;gap:12px}
+  .title{display:none}
+  main{padding:4px 16px 32px}
+  nav.sections{padding:0 12px}
+  .g2,.g3,.tiles{grid-template-columns:1fr}
+  .span2{grid-column:auto}
+  footer ul{columns:1}
+}
+@media (prefers-reduced-motion: reduce){ .dot{animation:none} .progress i{transition:none} }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-in">
+    <span class="brand">Petra Ride</span>
+    <span class="title">Live operations</span>
+    <span class="live"><span class="dot" id="liveDot"></span><span id="liveText">Connecting…</span></span>
+    <span class="spacer"></span>
+    <div class="clock"><b id="clock">--:--</b><span id="nextIn">Amman time</span></div>
+    <button class="btn" id="refreshBtn" type="button">Refresh now</button>
+  </div>
+  <div class="progress"><i id="progress"></i></div>
+  <nav class="sections" aria-label="Sections">
+    <a href="#today">Today</a><a href="#hourly">By hour</a><a href="#zones">Zones</a><a href="#amman">Amman</a><a href="#trends">Trends</a>
+  </nav>
+</header>
+
+<main>
+  <!-- TODAY -->
+  <section id="today">
+    <h2>Today so far</h2>
+    <p class="lede">Every comparison is to the same point in time on the earlier day, unless noted.</p>
+    <div class="today">
+      <div class="card hero" id="c-hero" data-src="zoneSame">
+        <div class="msg"></div>
+        <div>
+          <div class="label">Completed trips</div>
+          <div class="big" id="heroBig">—</div>
+          <div class="asof" id="heroAsOf"></div>
+        </div>
+        <div class="cmp" id="heroCmp"></div>
+      </div>
+      <div class="tiles">
+        <div class="card tile" id="c-demand" data-src="demand"><div class="msg"></div><div class="k">Real demand (requests)</div><div class="v" id="tDemand">—</div><p class="l" id="tDemandL"></p></div>
+        <div class="card tile" id="c-rev" data-src="finance"><div class="msg"></div><div class="k">Net revenue</div><div class="v" id="tRev">—</div><p class="l" id="tRevL"></p></div>
+        <div class="card tile" id="c-uns" data-src="unserved"><div class="msg"></div><div class="k">Unserved riders</div><div class="v" id="tUns">—</div><p class="l" id="tUnsL"></p></div>
+        <div class="card tile" id="c-promo" data-src="promoHour"><div class="msg"></div><div class="k">Promo discount given</div><div class="v" id="tPromo">—</div><p class="l" id="tPromoL"></p></div>
+        <div class="card tile" id="c-visa" data-src="visa"><div class="msg"></div><div class="k">Card-paid trips</div><div class="v" id="tVisa">—</div><p class="l" id="tVisaL"></p></div>
+        <div class="card tile" id="c-mtd" data-src="ppi"><div class="msg"></div><div class="k">Completed trips this month</div><div class="v" id="tMtd">—</div><p class="l" id="tMtdL"></p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOURLY -->
+  <section id="hourly">
+    <h2>Hour by hour</h2>
+    <p class="lede">Solid blue is today, dashed grey is the same weekday last week.</p>
+    <div class="grid g2">
+      <div class="card" id="c-trips" data-src="tripsHour">
+        <div class="card-head"><div><h3>Completed trips<span class="stale">Stale</span></h3><p class="sub" id="tripsSub"></p></div>
+          <div class="seg" data-chart="trips"><button type="button" data-mode="hourly" aria-pressed="true">Per hour</button><button type="button" data-mode="cum" aria-pressed="false">Running total</button></div></div>
+        <div class="msg"></div><div class="chart"><canvas id="chTrips"></canvas></div>
+      </div>
+      <div class="card" id="c-revh" data-src="finance">
+        <div class="card-head"><div><h3>Net revenue (JD)<span class="stale">Stale</span></h3><p class="sub" id="revSub"></p></div>
+          <div class="seg" data-chart="rev"><button type="button" data-mode="hourly" aria-pressed="true">Per hour</button><button type="button" data-mode="cum" aria-pressed="false">Running total</button></div></div>
+        <div class="msg"></div><div class="chart"><canvas id="chRev"></canvas></div>
+      </div>
+      <div class="card" id="c-health" data-src="zonesHours,unserved">
+        <div class="card-head"><div><h3>Completion rate and unserved riders<span class="stale">Stale</span></h3><p class="sub">All zones. Bars are riders who got no trip, the line is completion rate.</p></div></div>
+        <div class="msg"></div><div class="chart"><canvas id="chHealth"></canvas></div>
+      </div>
+      <div class="card" id="c-promoh" data-src="promoHour">
+        <div class="card-head"><div><h3>Promo discount by hour<span class="stale">Stale</span></h3><p class="sub">Bars are JD discounted, the line is the share of completed trips with a discount.</p></div></div>
+        <div class="msg"></div><div class="chart"><canvas id="chPromo"></canvas></div>
+      </div>
+      <div class="card span2" id="c-users" data-src="zonesHours">
+        <div class="card-head"><div><h3>Unique riders with a request<span class="stale">Stale</span></h3><p class="sub">Today versus the same weekday last week, all zones. The current hour is still filling.</p></div></div>
+        <div class="msg"></div><div class="chart" style="height:240px"><canvas id="chUsers"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ZONES -->
+  <section id="zones">
+    <h2>Zones</h2>
+    <p class="lede">Where the day is ahead or behind, and how each zone is serving riders.</p>
+    <div class="grid g3">
+      <div class="card span2" id="c-zsame" data-src="zoneSame">
+        <div class="card-head"><div><h3>Completed trips at the same time<span class="stale">Stale</span></h3><p class="sub" id="zsameSub"></p></div>
+          <label class="chk"><input type="checkbox" id="hideZero" checked> Hide zones with no trips</label></div>
+        <div class="msg"></div><div class="tbl-wrap"><table id="tblZSame"></table></div>
+      </div>
+      <div class="card" id="c-mtdz" data-src="ppi">
+        <div class="card-head"><div><h3>Month to date vs last month<span class="stale">Stale</span></h3><p class="sub">Growth in completed trips. Hover for volumes and promo change.</p></div></div>
+        <div class="msg"></div><div class="chart tall"><canvas id="chMtd"></canvas></div>
+      </div>
+      <div class="card span2" id="c-zhealth" data-src="zoneCmp">
+        <div class="card-head"><div><h3>Zone health vs last week<span class="stale">Stale</span></h3><p class="sub">Completion rate today against the same weekday last week. Changes are counts unless marked %.</p></div></div>
+        <div class="msg"></div><div class="tbl-wrap"><table id="tblZHealth"></table></div>
+      </div>
+      <div class="card" id="c-price" data-src="avgPrice">
+        <div class="card-head"><div><h3>Average fare today (JD)<span class="stale">Stale</span></h3><p class="sub">Completed trips by zone.</p></div></div>
+        <div class="msg"></div><div class="chart"><canvas id="chPrice"></canvas></div>
+      </div>
+      <div class="card span2" id="c-svc" data-src="svc" style="grid-column:1/-1">
+        <div class="card-head"><div><h3>Zones by service class, today<span class="stale">Stale</span></h3><p class="sub">Unassigned means no driver accepted. Arrival is minutes from accept to pickup.</p></div>
+          <select id="svcZone" aria-label="Filter by zone"><option value="">All zones</option></select></div>
+        <div class="msg"></div><div class="tbl-wrap"><table id="tblSvc"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AMMAN -->
+  <section id="amman">
+    <h2>Amman</h2>
+    <p class="lede">The biggest zone, hour by hour, with dispatch speed.</p>
+    <div class="grid g2">
+      <div class="card span2" id="c-acmp" data-src="ammanCmp">
+        <div class="card-head"><div><h3>Completion rate vs last week<span class="stale">Stale</span></h3><p class="sub">Hover an hour for the change in completed trips.</p></div></div>
+        <div class="msg"></div><div class="chart"><canvas id="chAmman"></canvas></div>
+      </div>
+      <div class="card span2" id="c-ahours" data-src="ammanHours">
+        <div class="card-head"><div><h3>Dispatch by hour<span class="stale">Stale</span></h3><p class="sub">Darker shading means a stronger value. For accept time, darker is slower.</p></div></div>
+        <div class="msg"></div><div class="tbl-wrap"><table id="tblAmman"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TRENDS -->
+  <section id="trends">
+    <h2>Trends</h2>
+    <p class="lede">Today in the context of recent weeks.</p>
+    <div class="grid g2">
+      <div class="card" id="c-dem" data-src="demand">
+        <div class="card-head"><div><h3>Real demand, same weekday and time<span class="stale">Stale</span></h3><p class="sub" id="demSub"></p></div></div>
+        <div class="msg"></div><div class="chart"><canvas id="chDemand"></canvas></div>
+      </div>
+      <div class="card" id="c-visad" data-src="visa">
+        <div class="card-head"><div><h3>Card-paid trips per day<span class="stale">Stale</span></h3><p class="sub">Last 30 days.</p></div></div>
+        <div class="msg"></div><div class="chart"><canvas id="chVisa"></canvas></div>
+        <div class="legend-note"><span><i style="background:var(--today)"></i>Sunday to Thursday</span><span><i style="background:var(--lastweek)"></i>Friday and Saturday</span><span><i style="background:var(--orange)"></i>Today, in progress</span></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <details>
+    <summary id="srcSummary">Data sources</summary>
+    <ul id="srcList"></ul>
+  </details>
+  <p>Data from Metabase, refreshed every 5 minutes. All times are Amman time.</p>
+</footer>
+
+<script>
+(() => {
+'use strict';
+
+const REFRESH_MS = 5 * 60 * 1000;
+const METABASE = 'https://analytics.riden.app/public/question/';
+const SOURCES = {
+  ppi:        { id: '6f1b308f-112c-4690-8fab-486bd6e5abcd', name: 'PPI - Zones' },
+  demand:     { id: '76006360-1bf6-4c73-ae7d-986c6fcb7be7', name: 'Real Demand - Today vs Last 4 Weeks' },
+  ammanHours: { id: '6f4568f4-dad3-4691-bebd-a90a0e7b06bb', name: 'Amman Analysis per hours' },
+  zonesHours: { id: '9841cb62-3e42-4c5d-acdd-ed6b3da1d3f3', name: 'Zones Analysis per hours range Over All' },
+  zoneCmp:    { id: '44bd6515-814a-49fb-a0ce-ce169587fe79', name: 'Zone comparing with last week' },
+  svc:        { id: '2145aa50-a36e-402f-8f18-51e54fd329e2', name: 'Zones Analysis per day for each zone & service type' },
+  avgPrice:   { id: '6b811f27-b5db-43ef-b0e1-db06de37d627', name: 'Avg Price Analysis' },
+  unserved:   { id: 'e205fce9-3b3c-4f30-b6e8-02559ac43aa4', name: 'Unserved Trips/hour' },
+  promoHour:  { id: 'c8ae5479-db8e-499c-84a4-29d3bcf73745', name: 'Promo Per hour - Current Date' },
+  visa:       { id: '7d9b3c18-3be0-4862-afed-c85307f62673', name: 'Visa Trips - Per day' },
+  tripsHour:  { id: 'ea279495-ea79-4802-a43c-7cfec8350eb5', name: 'Current With Same Previous Week' },
+  finance:    { id: '6faf1714-c51a-4de5-84e6-ece9929d7ba8', name: 'Trips Finance Data - Current date vs Last Week' },
+  ammanCmp:   { id: '9126c381-ae08-4f31-bc4a-cb97ab65aa33', name: 'Amman comparing with last week' },
+  zoneSame:   { id: 'bc7eb357-8b8b-4ea2-ba72-d47134cf8a42', name: 'Completed Trips By Zone - Same Time Comparison' }
+};
+
+const DATA = {}, STATUS = {}, charts = {};
+const MODE = { trips: 'hourly', rev: 'hourly' };
+let loading = false, nextAt = Date.now() + REFRESH_MS;
+
+/* ---------- parsing helpers ---------- */
+const norm = h => String(h).replace(/^\uFEFF/, '').toLowerCase()
+  .replace(/%/g, ' pct ').replace(/#/g, ' n ').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+function num(v){
+  if (v === null || v === undefined) return null;
+  if (typeof v === 'number') return isFinite(v) ? v : null;
+  let s = String(v).trim(); if (!s) return null;
+  let neg = /^\(.*\)$/.test(s);
+  s = s.replace(/[(),\s]|JOD|JD|%/gi, '');
+  const n = parseFloat(s);
+  return isNaN(n) ? null : (neg ? -n : n);
+}
+function hourOf(v){
+  if (v === null || v === undefined || v === '') return null;
+  const s = String(v).trim();
+  if (/^\d{1,2}(\.0+)?$/.test(s)) return parseInt(s, 10);
+  const m = s.match(/(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?\s*(AM|PM)?/i);
+  if (!m) return null;
+  let h = parseInt(m[1], 10);
+  if (m[3]) { const pm = /pm/i.test(m[3]); if (pm && h < 12) h += 12; if (!pm && h === 12) h = 0; }
+  return h;
+}
+function dateOf(v){
+  if (!v) return null;
+  const s = String(v).trim();
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], 12));
+  const d = new Date(s);
+  return isNaN(d) ? null : new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), 12));
+}
+const zoneKey = z => String(z || '').replace(/^Jordan::/i, '').replace(/\s+/g, '').toLowerCase();
+const zoneName = z => String(z || '').replace(/^Jordan::/i, '').replace(/([a-z])([A-Z])/g, '$1 $2').trim();
+const hh = h => String(h).padStart(2, '0') + ':00';
+const sum = (arr, f) => arr.reduce((a, r) => a + (f(r) || 0), 0);
+
+/* ---------- formatting ---------- */
+const fInt = v => v == null ? '—' : Math.round(v).toLocaleString('en-US');
+const fDec = (v, d = 1) => v == null ? '—' : v.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+const fSign = (v, d = 0) => v == null ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + (d ? fDec(Math.abs(v), d) : fInt(Math.abs(v)));
+const pctChange = (cur, prev) => (cur == null || !prev) ? null : (cur - prev) / prev * 100;
+const cls = (v, goodUp = true) => v == null || Math.abs(v) < 0.05 ? 'flat' : ((v > 0) === goodUp ? 'up' : 'down');
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const rateClass = v => v == null ? '' : v >= 80 ? 'good' : v >= 60 ? 'warn' : 'bad';
+function deltaHTML(cur, prev, goodUp = true){
+  const d = cur - prev, p = pctChange(cur, prev);
+  return `<span class="${cls(d, goodUp)}">${fSign(d)}${p == null ? '' : ` (${fSign(p, 1)}%)`}</span>`;
+}
+
+/* ---------- theme ---------- */
+function theme(){
+  const cs = getComputedStyle(document.documentElement);
+  const g = n => cs.getPropertyValue(n).trim();
+  return { today: g('--today'), last: g('--lastweek'), orange: g('--orange'), green: g('--green'), red: g('--red'),
+           ink: g('--ink'), muted: g('--muted'), line: g('--line'), soft: g('--soft-blue'), surface: g('--surface') };
+}
+function alpha(hex, a){
+  const h = hex.replace('#', ''); const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
+  return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`;
+}
+function baseOptions(t, extra = {}){
+  return Object.assign({
+    responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, boxHeight: 8, color: t.ink, font: { weight: 600, size: 12 } } },
+      tooltip: { backgroundColor: '#292935', titleFont: { weight: 700 }, bodyFont: { weight: 500 }, padding: 10, cornerRadius: 8 }
+    },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: t.muted, font: { size: 11 }, maxRotation: 0, autoSkipPadding: 6 }, border: { color: t.line } },
+      y: { grid: { color: t.line }, ticks: { color: t.muted, font: { size: 11 } }, border: { display: false }, beginAtZero: true }
+    }
+  }, extra);
+}
+const endLabels = { id: 'endLabels', afterDatasetsDraw(chart, _, o){
+  if (!o || !o.format) return;
+  const { ctx } = chart, meta = chart.getDatasetMeta(0), t = theme();
+  ctx.save(); ctx.font = '600 11px Montserrat, Arial, sans-serif'; ctx.fillStyle = t.ink; ctx.textBaseline = 'middle';
+  meta.data.forEach((bar, i) => { const v = chart.data.datasets[0].data[i]; if (v == null) return;
+    const neg = v < 0; ctx.textAlign = neg ? 'right' : 'left'; ctx.fillText(o.format(v), bar.x + (neg ? -6 : 6), bar.y); });
+  ctx.restore(); } };
+function draw(key, canvasId, config){
+  config.plugins = [endLabels];
+  if (charts[key]) { charts[key].data = config.data; charts[key].options = config.options; charts[key].update(); return; }
+  charts[key] = new Chart(document.getElementById(canvasId), config);
+}
+
+/* ---------- card state ---------- */
+function setCard(id, keys){
+  const card = document.getElementById(id); if (!card) return false;
+  const missing = keys.filter(k => !DATA[k] || !DATA[k].length);
+  const stale = keys.some(k => STATUS[k] && STATUS[k].stale);
+  card.classList.toggle('is-stale', stale && !missing.length);
+  card.classList.toggle('empty', missing.length > 0);
+  if (missing.length) {
+    const failed = missing.some(k => STATUS[k] && STATUS[k].error);
+    card.querySelector('.msg').textContent = failed
+      ? `Couldn’t load ${missing.map(k => SOURCES[k].name).join(', ')}. It will retry on the next refresh.`
+      : (loading ? 'Loading…' : `No rows returned by ${missing.map(k => SOURCES[k].name).join(', ')} yet.`);
+  }
+  return !missing.length;
+}
+function safe(id, keys, fn){
+  if (!setCard(id, keys)) return;
+  try { fn(); } catch (e) {
+    console.error(id, e);
+    const card = document.getElementById(id); card.classList.add('empty');
+    card.querySelector('.msg').textContent = 'This view couldn’t be drawn. The query columns may have changed.';
+  }
+}
+
+/* ---------- loading ---------- */
+async function fetchCsv(id){
+  const tries = [`/mb/${id}?t=${Date.now()}`, `${METABASE}${id}.csv`];
+  let lastErr;
+  for (const url of tries) {
+    try {
+      const r = await fetch(url, { cache: 'no-store' });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const txt = await r.text();
+      if (/^\s*</.test(txt)) throw new Error('Not CSV');
+      return txt;
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr;
+}
+async function loadAll(){
+  if (loading) return;
+  loading = true;
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = true; btn.textContent = 'Refreshing…';
+  await Promise.all(Object.entries(SOURCES).map(async ([key, src]) => {
+    try {
+      const txt = await fetchCsv(src.id);
+      const rows = Papa.parse(txt, { header: true, skipEmptyLines: true, transformHeader: norm }).data;
+      DATA[key] = rows; STATUS[key] = { ok: true, at: new Date(), rows: rows.length };
+    } catch (e) {
+      STATUS[key] = { ok: false, error: String(e.message || e), stale: !!DATA[key], at: STATUS[key] && STATUS[key].at };
+    }
+  }));
+  loading = false;
+  btn.disabled = false; btn.textContent = 'Refresh now';
+  nextAt = Date.now() + REFRESH_MS;
+  renderAll();
+  renderStatus();
+}
+function renderStatus(){
+  const keys = Object.keys(SOURCES);
+  const ok = keys.filter(k => STATUS[k] && STATUS[k].ok).length;
+  const t = ammanTime(new Date());
+  document.getElementById('liveDot').classList.toggle('err', ok < keys.length);
+  document.getElementById('liveText').textContent = ok === keys.length ? `Live, updated ${t}` : `${ok} of ${keys.length} sources updated at ${t}`;
+  document.getElementById('srcSummary').textContent = `Data sources (${ok} of ${keys.length} loaded)`;
+  document.getElementById('srcList').innerHTML = keys.map(k => {
+    const s = STATUS[k] || {};
+    return `<li class="${s.ok ? '' : 'bad'}">${esc(SOURCES[k].name)}: ${s.ok ? `${s.rows} rows` : esc(s.error || 'not loaded')}</li>`;
+  }).join('');
+}
+
+/* ---------- clock & countdown ---------- */
+const ammanFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Amman', hour: '2-digit', minute: '2-digit', hour12: false });
+const ammanTime = d => ammanFmt.format(d);
+function tick(){
+  const now = Date.now();
+  document.getElementById('clock').textContent = ammanTime(new Date());
+  const left = Math.max(0, nextAt - now);
+  document.getElementById('progress').style.width = `${(1 - left / REFRESH_MS) * 100}%`;
+  const m = Math.floor(left / 60000), s = Math.floor(left / 1000) % 60;
+  document.getElementById('nextIn').textContent = loading ? 'Refreshing…' : `Next refresh in ${m}:${String(s).padStart(2, '0')}`;
+  if (left === 0 && !loading && document.visibilityState === 'visible') loadAll();
+}
+
+/* ---------- derived ---------- */
+function currentHour(){
+  const rows = DATA.tripsHour || [];
+  let h = -1;
+  rows.forEach(r => { const x = hourOf(r.hour_of_day); if (x != null && num(r.trips_today) > 0) h = Math.max(h, x); });
+  if (h < 0) (DATA.finance || []).forEach(r => { const x = hourOf(r.hour); if (x != null && num(r.net_revenue_today) > 0) h = Math.max(h, x); });
+  return h < 0 ? +ammanTime(new Date()).slice(0, 2) : h;
+}
+
+/* ---------- TODAY ---------- */
+function renderHero(){
+  safe('c-hero', ['zoneSame'], () => {
+    const rows = DATA.zoneSame;
+    let tot = rows.find(r => /^total$/i.test(String(r.zone).trim()));
+    const zones = rows.filter(r => r !== tot);
+    const get = f => tot ? num(tot[f]) : sum(zones, r => num(r[f]));
+    const today = get('today_trips');
+    document.getElementById('heroBig').textContent = fInt(today);
+    const asof = rows[0] && rows[0].jordan_current_time;
+    const h = hourOf(asof);
+    const mm = asof && String(asof).match(/\d{1,2}:(\d{2})/);
+    document.getElementById('heroAsOf').textContent = h != null ? `As of ${String(h).padStart(2, '0')}:${mm ? mm[1] : '00'} Amman time` : '';
+    const line = (label, f) => {
+      const prev = get(f), d = today - prev, p = pctChange(today, prev);
+      return `<span>${label}</span><span class="n">${fInt(prev)}</span><span class="d ${cls(d)}">${fSign(p, 1)}%</span>`;
+    };
+    document.getElementById('heroCmp').innerHTML =
+      line('Yesterday', 'yesterday_trips') + line('Last week', 'last_week_trips') + line('Two weeks ago', 'two_weeks_ago_trips');
+  });
+}
+function tile(id, value, lines){ document.getElementById(id).innerHTML = value; document.getElementById(id + 'L').innerHTML = lines; }
+function renderTiles(){
+  safe('c-demand', ['demand'], () => {
+    const rows = DATA.demand;
+    const lab = r => String(r.period_label || '').toLowerCase();
+    const today = rows.find(r => lab(r) === 'today') || rows[0];
+    const t = num(today.real_demand);
+    const wk = n => rows.find(r => lab(r).startsWith(`${n} week`));
+    const lw = wk(1) ? num(wk(1).real_demand) : null;
+    const four = [1, 2, 3, 4].map(wk).filter(Boolean).map(r => num(r.real_demand));
+    const avg4 = four.length ? four.reduce((a, b) => a + b, 0) / four.length : null;
+    const p1 = pctChange(t, lw), p4 = pctChange(t, avg4);
+    tile('tDemand', fInt(t),
+      `<span class="${cls(p1)}">${fSign(p1, 1)}%</span> vs last week, <span class="${cls(p4)}">${fSign(p4, 1)}%</span> vs 4-week average`);
+  });
+  safe('c-rev', ['finance'], () => {
+    const rows = DATA.finance, h = currentHour();
+    const today = sum(rows, r => num(r.net_revenue_today));
+    const full = rows.filter(r => hourOf(r.hour) < h);
+    const a = sum(full, r => num(r.net_revenue_today)), b = sum(full, r => num(r.net_revenue_last_week));
+    const p = pctChange(a, b);
+    tile('tRev', `${fInt(today)}<small>JD</small>`,
+      h > 0 ? `<span class="${cls(p)}">${fSign(p, 1)}%</span> vs last week, full hours to ${hh(h)}` : 'Comparison starts after the first full hour');
+  });
+  safe('c-uns', ['unserved'], () => {
+    const rows = DATA.unserved;
+    const total = sum(rows, r => num(r.unserved_riders));
+    const peak = rows.reduce((m, r) => num(r.unserved_riders) > num(m.unserved_riders) ? r : m, rows[0]);
+    tile('tUns', fInt(total), `Worst hour ${hh(hourOf(peak.hour))} with ${fInt(num(peak.unserved_riders))} riders (${fDec(num(peak.unserved_riders_pct), 0)}%)`);
+  });
+  safe('c-promo', ['promoHour'], () => {
+    const rows = DATA.promoHour;
+    const jd = sum(rows, r => num(r.promo_with_discount_jd));
+    const trips = sum(rows, r => num(r.completed_trips));
+    const share = trips ? sum(rows, r => num(r.completed_trips) * num(r.promo_with_discount_percentage)) / trips : null;
+    tile('tPromo', `${fInt(jd)}<small>JD</small>`, `${fDec(share, 1)}% of completed trips had a discount`);
+  });
+  safe('c-visa', ['visa'], () => {
+    const rows = visaRows();
+    const last = rows[rows.length - 1];
+    const lw = rows.find(r => r.date.getTime() === last.date.getTime() - 7 * 864e5);
+    tile('tVisa', fInt(last.v), lw ? `Same day last week finished at ${fInt(lw.v)}` : 'Today, in progress');
+  });
+  safe('c-mtd', ['ppi'], () => {
+    const rows = DATA.ppi;
+    const tot = rows.find(r => /^total$/i.test(String(r.zone).trim()));
+    const zs = rows.filter(r => r !== tot);
+    const mtd = tot ? num(tot.completed_trips_mtd) : sum(zs, r => num(r.completed_trips_mtd));
+    const lm = tot ? num(tot.last_month) : sum(zs, r => num(r.last_month));
+    const p = pctChange(mtd, lm);
+    tile('tMtd', fInt(mtd), `<span class="${cls(p)}">${fSign(p, 1)}%</span> vs last month (${fInt(lm)})`);
+  });
+}
+
+/* ---------- HOURLY ---------- */
+function cumulative(arr, upto){ let s = 0; return arr.map((v, i) => (upto != null && i > upto) ? null : (s += v || 0)); }
+function renderTrips(){
+  safe('c-trips', ['tripsHour'], () => {
+    const t = theme(), h = currentHour();
+    const by = {}; DATA.tripsHour.forEach(r => { const x = hourOf(r.hour_of_day); if (x != null) by[x] = r; });
+    const hours = [...Array(24).keys()];
+    let today = hours.map(x => x > h ? null : num(by[x] && by[x].trips_today));
+    let last = hours.map(x => num(by[x] && by[x].trips_last_week));
+    const cum = MODE.trips === 'cum';
+    if (cum) { today = cumulative(today, h); last = cumulative(last); }
+    const lwSame = cumulative(hours.map(x => num(by[x] && by[x].trips_last_week)))[Math.max(h - 1, 0)];
+    const tdSame = cumulative(hours.map(x => num(by[x] && by[x].trips_today)))[Math.max(h - 1, 0)];
+    const p = pctChange(tdSame, lwSame);
+    document.getElementById('tripsSub').innerHTML = h > 0
+      ? `Through ${hh(h)}: <b>${fInt(tdSame)}</b> today vs ${fInt(lwSame)} last week, <span class="${cls(p)}"><b>${fSign(p, 1)}%</b></span>. ${hh(h)} is still in progress.`
+      : 'First hour in progress.';
+    draw('trips', 'chTrips', {
+      type: 'line',
+      data: { labels: hours.map(hh), datasets: [
+        { label: 'Today', data: today, borderColor: t.today, backgroundColor: alpha(t.today, .12), fill: true, tension: .3, pointRadius: 2, borderWidth: 2.5,
+          segment: { borderDash: c => c.p1DataIndex === h ? [3, 3] : undefined }, pointBackgroundColor: hours.map(x => x === h ? t.surface : t.today) },
+        { label: 'Last week', data: last, borderColor: t.last, borderDash: [6, 4], pointRadius: 0, tension: .3, borderWidth: 2 }
+      ] },
+      options: baseOptions(t, { plugins: Object.assign(baseOptions(t).plugins, { tooltip: Object.assign(baseOptions(t).plugins.tooltip, {
+        callbacks: { label: c => ` ${c.dataset.label}: ${fInt(c.parsed.y)}` } }) }) })
+    });
+  });
+}
+function renderRevenue(){
+  safe('c-revh', ['finance'], () => {
+    const t = theme(), h = currentHour();
+    const by = {}; DATA.finance.forEach(r => { const x = hourOf(r.hour); if (x != null) by[x] = r; });
+    const hours = [...Array(24).keys()];
+    let today = hours.map(x => x > h ? null : num(by[x] && by[x].net_revenue_today));
+    let last = hours.map(x => num(by[x] && by[x].net_revenue_last_week));
+    const cum = MODE.rev === 'cum';
+    if (cum) { today = cumulative(today, h); last = cumulative(last); }
+    const lwDay = sum(DATA.finance, r => num(r.net_revenue_last_week));
+    document.getElementById('revSub').textContent = `Last week’s same day closed at ${fInt(lwDay)} JD.`;
+    const opts = baseOptions(t);
+    opts.plugins.tooltip.callbacks = { label: c => ` ${c.dataset.label}: ${fDec(c.parsed.y, 0)} JD` };
+    draw('rev', 'chRev', {
+      type: 'bar',
+      data: { labels: hours.map(hh), datasets: [
+        { type: 'bar', label: 'Today', data: today, backgroundColor: hours.map(x => x === h ? alpha(t.today, .45) : t.today), borderRadius: 3, order: 2 },
+        { type: 'line', label: 'Last week', data: last, borderColor: t.last, borderDash: [6, 4], pointRadius: 0, tension: .3, borderWidth: 2, order: 1 }
+      ] },
+      options: opts
+    });
+  });
+}
+function renderHealth(){
+  safe('c-health', ['zonesHours', 'unserved'], () => {
+    const t = theme();
+    const comp = {}; DATA.zonesHours.forEach(r => { const x = hourOf(r.hour_start); if (x != null) comp[x] = r; });
+    const uns = {}; DATA.unserved.forEach(r => { const x = hourOf(r.hour); if (x != null) uns[x] = r; });
+    const hours = [...new Set([...Object.keys(comp), ...Object.keys(uns)].map(Number))].sort((a, b) => a - b);
+    const opts = baseOptions(t);
+    opts.scales.y.title = { display: true, text: 'Unserved riders', color: t.muted, font: { size: 11, weight: 600 } };
+    opts.scales.y1 = { position: 'right', min: 0, max: 100, grid: { display: false }, border: { display: false },
+      ticks: { color: t.muted, font: { size: 11 }, callback: v => v + '%' } };
+    opts.plugins.tooltip.callbacks = { label: c => c.dataset.yAxisID === 'y1'
+      ? ` Completion: ${fDec(c.parsed.y, 1)}%`
+      : ` Unserved: ${fInt(c.parsed.y)} (${fDec(num(uns[hours[c.dataIndex]] && uns[hours[c.dataIndex]].unserved_riders_pct), 0)}% of riders)` };
+    draw('health', 'chHealth', {
+      type: 'bar',
+      data: { labels: hours.map(hh), datasets: [
+        { type: 'line', label: 'Completion rate', yAxisID: 'y1', data: hours.map(x => num(comp[x] && comp[x].completed_percentage)), borderColor: t.today, backgroundColor: t.today, tension: .3, pointRadius: 3, borderWidth: 2.5, order: 1 },
+        { type: 'bar', label: 'Unserved riders', yAxisID: 'y', data: hours.map(x => num(uns[x] && uns[x].unserved_riders)), backgroundColor: alpha(t.red, .7), borderRadius: 3, order: 2 }
+      ] },
+      options: opts
+    });
+  });
+}
+function renderPromo(){
+  safe('c-promoh', ['promoHour'], () => {
+    const t = theme();
+    const rows = DATA.promoHour.map(r => ({ h: hourOf(r.hour), jd: num(r.promo_with_discount_jd), pct: num(r.promo_with_discount_percentage), n: num(r.completed_trips) }))
+      .filter(r => r.h != null).sort((a, b) => a.h - b.h);
+    const opts = baseOptions(t);
+    opts.scales.y.title = { display: true, text: 'JD', color: t.muted, font: { size: 11, weight: 600 } };
+    opts.scales.y1 = { position: 'right', min: 0, suggestedMax: 40, grid: { display: false }, border: { display: false }, ticks: { color: t.muted, font: { size: 11 }, callback: v => v + '%' } };
+    opts.plugins.tooltip.callbacks = { label: c => c.dataset.yAxisID === 'y1' ? ` Trips with discount: ${fDec(c.parsed.y, 1)}%` : ` Discount: ${fDec(c.parsed.y, 0)} JD on ${fInt(rows[c.dataIndex].n)} trips` };
+    draw('promo', 'chPromo', {
+      type: 'bar',
+      data: { labels: rows.map(r => hh(r.h)), datasets: [
+        { type: 'line', label: 'Share of trips with discount', yAxisID: 'y1', data: rows.map(r => r.pct), borderColor: t.orange, backgroundColor: t.orange, tension: .3, pointRadius: 3, borderWidth: 2, order: 1 },
+        { type: 'bar', label: 'Discount (JD)', yAxisID: 'y', data: rows.map(r => r.jd), backgroundColor: t.today, borderRadius: 3, order: 2 }
+      ] },
+      options: opts
+    });
+  });
+}
+function renderUsers(){
+  safe('c-users', ['zonesHours'], () => {
+    const t = theme();
+    const rows = DATA.zonesHours.map(r => ({ h: hourOf(r.hour_start), a: num(r.n_unique_users_today), b: num(r.n_unique_users_same_day_last_week) }))
+      .filter(r => r.h != null).sort((x, y) => x.h - y.h);
+    const last = rows.length ? rows[rows.length - 1].h : -1;
+    const opts = baseOptions(t);
+    opts.plugins.tooltip.callbacks = { label: c => ` ${c.dataset.label}: ${fInt(c.parsed.y)}`,
+      afterBody: items => { const r = rows[items[0].dataIndex]; const p = pctChange(r.a, r.b); return `Change: ${fSign(p, 1)}%${r.h === last ? ' (hour in progress)' : ''}`; } };
+    draw('users', 'chUsers', {
+      type: 'bar',
+      data: { labels: rows.map(r => hh(r.h)), datasets: [
+        { label: 'Today', data: rows.map(r => r.a), backgroundColor: rows.map(r => r.h === last ? alpha(t.today, .45) : t.today), borderRadius: 3 },
+        { label: 'Last week', data: rows.map(r => r.b), backgroundColor: alpha(t.last, .6), borderRadius: 3 }
+      ] },
+      options: opts
+    });
+  });
+}
+
+/* ---------- ZONES ---------- */
+function renderZoneSame(){
+  safe('c-zsame', ['zoneSame'], () => {
+    const hide = document.getElementById('hideZero').checked;
+    const rows = DATA.zoneSame;
+    const tot = rows.find(r => /^total$/i.test(String(r.zone).trim()));
+    let zs = rows.filter(r => r !== tot).map(r => ({
+      z: zoneName(r.zone), t: num(r.today_trips), y: num(r.yesterday_trips), w: num(r.last_week_trips), w2: num(r.two_weeks_ago_trips)
+    }));
+    if (hide) zs = zs.filter(r => r.t || r.y || r.w || r.w2);
+    zs.sort((a, b) => b.t - a.t);
+    const max = Math.max(1, ...zs.map(r => r.t));
+    const row = (r, isTot) => `<tr class="${isTot ? 'total' : ''}"><td>${esc(r.z)}</td>
+      <td>${isTot ? '' : `<span class="bar" style="width:${Math.round(r.t / max * 70)}px"></span>`}${fInt(r.t)}</td>
+      <td>${deltaHTML(r.t, r.y)}</td><td>${deltaHTML(r.t, r.w)}</td><td>${deltaHTML(r.t, r.w2)}</td></tr>`;
+    const totRow = tot ? { z: 'All zones', t: num(tot.today_trips), y: num(tot.yesterday_trips), w: num(tot.last_week_trips), w2: num(tot.two_weeks_ago_trips) } : null;
+    document.getElementById('tblZSame').innerHTML =
+      `<thead><tr><th>Zone</th><th>Today</th><th>vs yesterday</th><th>vs last week</th><th>vs two weeks ago</th></tr></thead>
+       <tbody>${totRow ? row(totRow, true) : ''}${zs.map(r => row(r)).join('')}</tbody>`;
+    const asof = rows[0] && rows[0].jordan_current_time; const h = hourOf(asof); const mm = asof && String(asof).match(/\d{1,2}:(\d{2})/);
+    document.getElementById('zsameSub').textContent = h != null ? `Each day counted up to ${String(h).padStart(2, '0')}:${mm ? mm[1] : '00'}.` : '';
+  });
+}
+function renderMtd(){
+  safe('c-mtdz', ['ppi'], () => {
+    const t = theme();
+    const rows = DATA.ppi.filter(r => !/^total$/i.test(String(r.zone).trim()))
+      .map(r => ({ z: zoneName(r.zone), mtd: num(r.completed_trips_mtd), lm: num(r.last_month), g: num(r.growth_pct), pjd: num(r.promo_diff_jd), pp: num(r.promo_pct) }))
+      .map(r => ({ ...r, g: r.g != null ? r.g : pctChange(r.mtd, r.lm) }))
+      .sort((a, b) => b.mtd - a.mtd);
+    const opts = baseOptions(t, { indexAxis: 'y' });
+    opts.scales.x = { grid: { color: t.line }, border: { display: false }, ticks: { color: t.muted, font: { size: 11 }, callback: v => v + '%' } };
+    opts.scales.y = { grid: { display: false }, border: { color: t.line }, ticks: { color: t.ink, font: { size: 12, weight: 600 } } };
+    opts.plugins.legend = { display: false };
+    opts.plugins.endLabels = { format: v => fSign(v, 1) + '%' };
+    opts.layout = { padding: { right: 44 } };
+    opts.plugins.tooltip.callbacks = { label: c => { const r = rows[c.dataIndex]; return [
+      ` Growth: ${fSign(r.g, 1)}%`, ` This month: ${fInt(r.mtd)}`, ` Last month: ${fInt(r.lm)}`,
+      ` Promo change: ${fSign(r.pjd)} JD (${fSign(r.pp, 1)}%)`]; } };
+    draw('mtd', 'chMtd', {
+      type: 'bar',
+      data: { labels: rows.map(r => r.z), datasets: [{ data: rows.map(r => r.g), backgroundColor: rows.map(r => r.g >= 0 ? t.green : t.red), borderRadius: 3, barThickness: 16 }] },
+      options: opts
+    });
+  });
+}
+function renderZoneHealth(){
+  safe('c-zhealth', ['zoneCmp'], () => {
+    const rows = DATA.zoneCmp.map(r => ({
+      z: zoneName(r.zone), ct: num(r.completed_pct_today), cl: num(r.completed_pct_last_week),
+      d: num(r.completed_trips_difference_count), u: num(r.n_of_unique_users_difference_count), p: num(r.promo_code_difference_pct)
+    })).filter(r => r.ct || r.cl || r.d);
+    const pp = r => (r.ct == null || r.cl == null) ? null : r.ct - r.cl;
+    document.getElementById('tblZHealth').innerHTML =
+      `<thead><tr><th>Zone</th><th>Completion today</th><th>Last week</th><th>Change (pts)</th><th>Completed trips</th><th>Unique riders</th><th>Promo trips %</th></tr></thead>
+       <tbody>${rows.map(r => `<tr><td>${esc(r.z)}</td>
+         <td><span class="pill ${rateClass(r.ct)}">${fDec(r.ct, 1)}%</span></td>
+         <td class="muted">${fDec(r.cl, 1)}%</td>
+         <td class="${cls(pp(r))}">${fSign(pp(r), 1)}</td>
+         <td class="${cls(r.d)}">${fSign(r.d)}</td>
+         <td class="${cls(r.u)}">${fSign(r.u)}</td>
+         <td>${fSign(r.p, 1)}%</td></tr>`).join('')}</tbody>`;
+  });
+}
+function renderPrice(){
+  safe('c-price', ['avgPrice'], () => {
+    const t = theme();
+    const rows = DATA.avgPrice.map(r => ({ z: zoneName(r.zone), v: num(r.avg_price) })).filter(r => r.v != null).sort((a, b) => b.v - a.v);
+    const opts = baseOptions(t, { indexAxis: 'y' });
+    opts.scales.x = { grid: { color: t.line }, border: { display: false }, beginAtZero: true, ticks: { color: t.muted, font: { size: 11 } } };
+    opts.scales.y = { grid: { display: false }, border: { color: t.line }, ticks: { color: t.ink, font: { size: 12, weight: 600 } } };
+    opts.plugins.legend = { display: false };
+    opts.plugins.endLabels = { format: v => fDec(v, 2) };
+    opts.layout = { padding: { right: 36 } };
+    opts.plugins.tooltip.callbacks = { label: c => ` ${fDec(c.parsed.x, 2)} JD` };
+    draw('price', 'chPrice', { type: 'bar', data: { labels: rows.map(r => r.z), datasets: [{ data: rows.map(r => r.v), backgroundColor: t.today, borderRadius: 3, barThickness: 16 }] }, options: opts });
+  });
+}
+function renderSvc(){
+  safe('c-svc', ['svc'], () => {
+    const sel = document.getElementById('svcZone');
+    const zones = [...new Set(DATA.svc.map(r => zoneName(r.zone)))].sort();
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">All zones</option>' + zones.map(z => `<option${z === cur ? ' selected' : ''}>${esc(z)}</option>`).join('');
+    const rows = DATA.svc.map(r => ({
+      z: zoneName(r.zone), s: r.service_class, n: num(r.total_rides), c: num(r.completed_trips), cp: num(r.completed_percentage),
+      un: num(r.unassigned_trips_percentage), nd: num(r.no_driver_found_percent), dr: num(r.driver_count),
+      arr: num(r.avg_accepted_to_arrival_completed_min), fare: num(r.avg_price_completed_trip), pr: num(r.promo_with_discount_percentage)
+    })).filter(r => !cur || r.z === cur).sort((a, b) => b.n - a.n);
+    document.getElementById('tblSvc').innerHTML =
+      `<thead><tr><th>Zone</th><th class="l">Service</th><th>Requests</th><th>Completed</th><th>Completion</th><th>Unassigned</th><th>No driver found</th><th>Drivers</th><th>Arrival (min)</th><th>Avg fare (JD)</th><th>Promo trips</th></tr></thead>
+       <tbody>${rows.map(r => `<tr><td>${esc(r.z)}</td><td class="l">${esc(r.s)}</td><td>${fInt(r.n)}</td><td>${fInt(r.c)}</td>
+         <td><span class="pill ${rateClass(r.cp)}">${fDec(r.cp, 1)}%</span></td>
+         <td>${fDec(r.un, 1)}%</td><td>${fDec(r.nd, 1)}%</td><td>${fInt(r.dr)}</td>
+         <td>${r.arr == null ? '—' : fDec(r.arr, 1)}</td><td>${r.fare == null ? '—' : fDec(r.fare, 2)}</td><td>${fDec(r.pr, 1)}%</td></tr>`).join('')}</tbody>`;
+  });
+}
+
+/* ---------- AMMAN ---------- */
+function renderAmmanCmp(){
+  safe('c-acmp', ['ammanCmp'], () => {
+    const t = theme();
+    const rows = DATA.ammanCmp.map(r => ({ h: hourOf(r.hour), a: num(r.completed_pct_today), b: num(r.completed_pct_last_week), d: num(r.completed_trips_difference_count) }))
+      .filter(r => r.h != null).sort((x, y) => x.h - y.h);
+    const lastToday = Math.max(-1, ...rows.filter(r => r.a != null).map(r => r.h));
+    const shown = rows.filter(r => r.h <= lastToday);
+    const opts = baseOptions(t);
+    opts.scales.y = { position: 'left', min: 0, max: 100, grid: { color: t.line }, border: { display: false }, ticks: { color: t.muted, font: { size: 11 }, callback: v => v + '%' } };
+        opts.plugins.tooltip.callbacks = { label: c => ` ${c.dataset.label}: ${fDec(c.parsed.y, 1)}%`,
+      afterBody: items => { const r = shown[items[0].dataIndex]; return `Completed trips vs last week: ${fSign(r.d)}${r.h === lastToday ? ' (hour in progress)' : ''}`; } };
+    draw('amman', 'chAmman', {
+      type: 'line',
+      data: { labels: shown.map(r => hh(r.h)), datasets: [
+        { type: 'line', label: 'Completion today', yAxisID: 'y', data: shown.map(r => r.a), borderColor: t.today, backgroundColor: t.today, tension: .3, pointRadius: 3, borderWidth: 2.5, order: 1 },
+        { type: 'line', label: 'Completion last week', yAxisID: 'y', data: shown.map(r => r.b), borderColor: t.last, borderDash: [6, 4], pointRadius: 0, tension: .3, borderWidth: 2, order: 1 },
+      ] },
+      options: opts
+    });
+  });
+}
+function renderAmmanHours(){
+  safe('c-ahours', ['ammanHours'], () => {
+    const t = theme();
+    const rows = DATA.ammanHours.map(r => ({
+      h: hourOf(r.hour_start), n: num(r.total_rides), cp: num(r.completed_percentage), cu: num(r.canceled_by_user_trips),
+      ac: num(r.avg_create_to_accept_completed_sec), ax: num(r.avg_create_to_accept_canceled_sec),
+      da: num(r.dispatch_acceptance_ratio_pct), dp: num(r.avg_drivers_per_trip)
+    })).filter(r => r.h != null).sort((a, b) => a.h - b.h);
+    const range = f => { const v = rows.map(r => r[f]).filter(x => x != null); return [Math.min(...v), Math.max(...v)]; };
+    const shade = (v, f, color) => {
+      if (v == null) return '';
+      const [lo, hi] = range(f); const a = hi === lo ? .15 : .08 + (v - lo) / (hi - lo) * .55;
+      return `style="background:${alpha(color, a.toFixed(2))};${a > .5 ? 'color:#fff;' : ''}"`;
+    };
+    document.getElementById('tblAmman').innerHTML =
+      `<thead><tr><th>Hour</th><th>Requests</th><th>Completion</th><th>Canceled by rider</th><th>Accept time, completed (s)</th><th>Accept time, canceled (s)</th><th>Dispatch acceptance</th><th>Drivers per trip</th></tr></thead>
+       <tbody>${rows.map(r => `<tr><td>${hh(r.h)}</td><td>${fInt(r.n)}</td>
+         <td class="heat" ${shade(r.cp, 'cp', t.today)}>${fDec(r.cp, 1)}%</td>
+         <td>${fInt(r.cu)}</td>
+         <td class="heat" ${shade(r.ac, 'ac', t.orange)}>${fDec(r.ac, 1)}</td>
+         <td class="heat" ${shade(r.ax, 'ax', t.orange)}>${fDec(r.ax, 1)}</td>
+         <td class="heat" ${shade(r.da, 'da', t.today)}>${fDec(r.da, 1)}%</td>
+         <td>${fDec(r.dp, 1)}</td></tr>`).join('')}</tbody>`;
+  });
+}
+
+/* ---------- TRENDS ---------- */
+function renderDemand(){
+  safe('c-dem', ['demand'], () => {
+    const t = theme();
+    const rows = DATA.demand.map(r => ({ l: String(r.period_label || ''), d: dateOf(r.window_start), v: num(r.real_demand), p: num(r.pct_change_vs_today) }))
+      .sort((a, b) => (a.d && b.d) ? a.d - b.d : 0);
+    const end = DATA.demand[0] && DATA.demand[0].window_end; const h = hourOf(end); const mm = end && String(end).match(/\d{1,2}:(\d{2})/);
+    document.getElementById('demSub').textContent = `Unique requests up to ${h != null ? String(h).padStart(2, '0') + ':' + (mm ? mm[1] : '00') : 'now'} on each date. Today is orange.`;
+    const opts = baseOptions(t);
+    opts.plugins.legend = { display: false };
+    opts.plugins.tooltip.callbacks = { title: i => `${rows[i[0].dataIndex].l}${rows[i[0].dataIndex].d ? ', ' + rows[i[0].dataIndex].d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }) : ''}`,
+      label: c => { const r = rows[c.dataIndex]; return /today/i.test(r.l) ? ` ${fInt(r.v)} requests` : ` ${fInt(r.v)} requests, today is ${fSign(r.p, 1)}%`; } };
+    draw('demand', 'chDemand', {
+      type: 'bar',
+      data: { labels: rows.map(r => r.d ? r.d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }) : r.l),
+        datasets: [{ data: rows.map(r => r.v), backgroundColor: rows.map(r => /today/i.test(r.l) ? t.orange : t.today), borderRadius: 3 }] },
+      options: opts
+    });
+  });
+}
+function visaRows(){
+  return DATA.visa.map(r => ({ date: dateOf(r.date), v: num(r.n_of_paid_trips) })).filter(r => r.date).sort((a, b) => a.date - b.date);
+}
+function renderVisa(){
+  safe('c-visad', ['visa'], () => {
+    const t = theme();
+    const rows = visaRows(), lastI = rows.length - 1;
+    const color = (r, i) => i === lastI ? t.orange : ([5, 6].includes(r.date.getUTCDay()) ? t.last : t.today);
+    const opts = baseOptions(t);
+    opts.plugins.legend = { display: false };
+    opts.plugins.tooltip.callbacks = { title: i => rows[i[0].dataIndex].date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short', timeZone: 'UTC' }),
+      label: c => ` ${fInt(c.parsed.y)} card-paid trips${c.dataIndex === lastI ? ' so far' : ''}` };
+    draw('visa', 'chVisa', {
+      type: 'bar',
+      data: { labels: rows.map(r => r.date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })),
+        datasets: [{ data: rows.map(r => r.v), backgroundColor: rows.map(color), borderRadius: 2 }] },
+      options: opts
+    });
+  });
+}
+
+/* ---------- orchestrate ---------- */
+function renderAll(){
+  if (window.Chart) {
+    Chart.defaults.font.family = 'Montserrat, "Segoe UI", Arial, sans-serif';
+    Chart.defaults.color = theme().muted;
+  }
+  [renderHero, renderTiles, renderTrips, renderRevenue, renderHealth, renderPromo, renderUsers,
+   renderZoneSame, renderMtd, renderZoneHealth, renderPrice, renderSvc, renderAmmanCmp, renderAmmanHours, renderDemand, renderVisa]
+    .forEach(fn => { try { fn(); } catch (e) { console.error(fn.name, e); } });
+}
+
+document.querySelectorAll('.seg').forEach(seg => seg.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  seg.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  MODE[seg.dataset.chart] = b.dataset.mode;
+  seg.dataset.chart === 'trips' ? renderTrips() : renderRevenue();
+}));
+document.getElementById('hideZero').addEventListener('change', renderZoneSame);
+document.getElementById('svcZone').addEventListener('change', renderSvc);
+document.getElementById('refreshBtn').addEventListener('click', loadAll);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Date.now() >= nextAt) loadAll(); });
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  Object.values(charts).forEach(c => c.destroy()); Object.keys(charts).forEach(k => delete charts[k]); renderAll();
+});
+
+if (!window.Chart || !window.Papa) {
+  document.getElementById('liveText').textContent = 'Chart libraries didn’t load. Check the network and reload.';
+  document.getElementById('liveDot').classList.add('err');
+  return;
+}
+renderAll();
+loadAll();
+setInterval(tick, 1000); tick();
+})();
+</script>
+</body>
+</html>
