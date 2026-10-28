@@ -86,7 +86,8 @@ h3{font-size:15px;font-weight:700;margin:0}
 .cmp .d{font-weight:700;text-align:right;min-width:74px}
 .hero .up{color:#7CE59B}.hero .down{color:#FFB3A8}
 .hero.empty .msg{background:var(--blue);color:#F9F9F9}
-.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.tiles{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:16px}
+.tiles .tile:nth-child(-n+3){grid-column:span 2}.tiles .tile:nth-child(n+4){grid-column:span 3}
 .tile .k{font-size:12px;font-weight:600;color:var(--muted)}
 .tile .v{font-size:28px;font-weight:800;letter-spacing:-.02em;margin:4px 0 6px}
 .tile .v small{font-size:14px;font-weight:600;color:var(--muted);margin-left:4px}
@@ -134,7 +135,7 @@ footer li.bad{color:var(--red)}
   main{padding:4px 16px 32px}
   nav.sections{padding:0 12px}
   .g2,.g3,.tiles{grid-template-columns:1fr}
-  .span2{grid-column:auto}
+  .span2,.tiles .tile:nth-child(n){grid-column:auto}
   footer ul{columns:1}
 }
 @media (prefers-reduced-motion: reduce){ .dot{animation:none} .progress i{transition:none} }
@@ -173,7 +174,6 @@ footer li.bad{color:var(--red)}
       </div>
       <div class="tiles">
         <div class="card tile" id="c-demand" data-src="demand"><div class="msg"></div><div class="k">Real demand (requests)</div><div class="v" id="tDemand">—</div><p class="l" id="tDemandL"></p></div>
-        <div class="card tile" id="c-rev" data-src="finance"><div class="msg"></div><div class="k">Net revenue</div><div class="v" id="tRev">—</div><p class="l" id="tRevL"></p></div>
         <div class="card tile" id="c-uns" data-src="unserved"><div class="msg"></div><div class="k">Unserved riders</div><div class="v" id="tUns">—</div><p class="l" id="tUnsL"></p></div>
         <div class="card tile" id="c-promo" data-src="promoHour"><div class="msg"></div><div class="k">Promo discount given</div><div class="v" id="tPromo">—</div><p class="l" id="tPromoL"></p></div>
         <div class="card tile" id="c-visa" data-src="visa"><div class="msg"></div><div class="k">Card-paid trips</div><div class="v" id="tVisa">—</div><p class="l" id="tVisaL"></p></div>
@@ -187,15 +187,10 @@ footer li.bad{color:var(--red)}
     <h2>Hour by hour</h2>
     <p class="lede">Solid blue is today, dashed grey is the same weekday last week.</p>
     <div class="grid g2">
-      <div class="card" id="c-trips" data-src="tripsHour">
+      <div class="card span2" id="c-trips" data-src="tripsHour">
         <div class="card-head"><div><h3>Completed trips<span class="stale">Stale</span></h3><p class="sub" id="tripsSub"></p></div>
           <div class="seg" data-chart="trips"><button type="button" data-mode="hourly" aria-pressed="true">Per hour</button><button type="button" data-mode="cum" aria-pressed="false">Running total</button></div></div>
         <div class="msg"></div><div class="chart"><canvas id="chTrips"></canvas></div>
-      </div>
-      <div class="card" id="c-revh" data-src="finance">
-        <div class="card-head"><div><h3>Net revenue (JD)<span class="stale">Stale</span></h3><p class="sub" id="revSub"></p></div>
-          <div class="seg" data-chart="rev"><button type="button" data-mode="hourly" aria-pressed="true">Per hour</button><button type="button" data-mode="cum" aria-pressed="false">Running total</button></div></div>
-        <div class="msg"></div><div class="chart"><canvas id="chRev"></canvas></div>
       </div>
       <div class="card" id="c-health" data-src="zonesHours,unserved">
         <div class="card-head"><div><h3>Completion rate and unserved riders<span class="stale">Stale</span></h3><p class="sub">All zones. Bars are riders who got no trip, the line is completion rate.</p></div></div>
@@ -245,15 +240,11 @@ footer li.bad{color:var(--red)}
   <!-- AMMAN -->
   <section id="amman">
     <h2>Amman</h2>
-    <p class="lede">The biggest zone, hour by hour, with dispatch speed.</p>
+    <p class="lede">The biggest zone, hour by hour.</p>
     <div class="grid g2">
       <div class="card span2" id="c-acmp" data-src="ammanCmp">
         <div class="card-head"><div><h3>Completion rate vs last week<span class="stale">Stale</span></h3><p class="sub">Hover an hour for the change in completed trips.</p></div></div>
         <div class="msg"></div><div class="chart"><canvas id="chAmman"></canvas></div>
-      </div>
-      <div class="card span2" id="c-ahours" data-src="ammanHours">
-        <div class="card-head"><div><h3>Dispatch by hour<span class="stale">Stale</span></h3><p class="sub">Darker shading means a stronger value. For accept time, darker is slower.</p></div></div>
-        <div class="msg"></div><div class="tbl-wrap"><table id="tblAmman"></table></div>
       </div>
     </div>
   </section>
@@ -293,7 +284,6 @@ const METABASE = 'https://analytics.riden.app/public/question/';
 const SOURCES = {
   ppi:        { id: '6f1b308f-112c-4690-8fab-486bd6e5abcd', name: 'PPI - Zones' },
   demand:     { id: '76006360-1bf6-4c73-ae7d-986c6fcb7be7', name: 'Real Demand - Today vs Last 4 Weeks' },
-  ammanHours: { id: '6f4568f4-dad3-4691-bebd-a90a0e7b06bb', name: 'Amman Analysis per hours' },
   zonesHours: { id: '9841cb62-3e42-4c5d-acdd-ed6b3da1d3f3', name: 'Zones Analysis per hours range Over All' },
   zoneCmp:    { id: '44bd6515-814a-49fb-a0ce-ce169587fe79', name: 'Zone comparing with last week' },
   svc:        { id: '2145aa50-a36e-402f-8f18-51e54fd329e2', name: 'Zones Analysis per day for each zone & service type' },
@@ -302,13 +292,12 @@ const SOURCES = {
   promoHour:  { id: 'c8ae5479-db8e-499c-84a4-29d3bcf73745', name: 'Promo Per hour - Current Date' },
   visa:       { id: '7d9b3c18-3be0-4862-afed-c85307f62673', name: 'Visa Trips - Per day' },
   tripsHour:  { id: 'ea279495-ea79-4802-a43c-7cfec8350eb5', name: 'Current With Same Previous Week' },
-  finance:    { id: '6faf1714-c51a-4de5-84e6-ece9929d7ba8', name: 'Trips Finance Data - Current date vs Last Week' },
   ammanCmp:   { id: '9126c381-ae08-4f31-bc4a-cb97ab65aa33', name: 'Amman comparing with last week' },
   zoneSame:   { id: 'bc7eb357-8b8b-4ea2-ba72-d47134cf8a42', name: 'Completed Trips By Zone - Same Time Comparison' }
 };
 
 const DATA = {}, STATUS = {}, charts = {};
-const MODE = { trips: 'hourly', rev: 'hourly' };
+const MODE = { trips: 'hourly' };
 let loading = false, nextAt = Date.now() + REFRESH_MS;
 
 /* ---------- parsing helpers ---------- */
@@ -384,15 +373,38 @@ function baseOptions(t, extra = {}){
     }
   }, extra);
 }
-const endLabels = { id: 'endLabels', afterDatasetsDraw(chart, _, o){
-  if (!o || !o.format) return;
-  const { ctx } = chart, meta = chart.getDatasetMeta(0), t = theme();
-  ctx.save(); ctx.font = '600 11px Montserrat, Arial, sans-serif'; ctx.fillStyle = t.ink; ctx.textBaseline = 'middle';
-  meta.data.forEach((bar, i) => { const v = chart.data.datasets[0].data[i]; if (v == null) return;
-    const neg = v < 0; ctx.textAlign = neg ? 'right' : 'left'; ctx.fillText(o.format(v), bar.x + (neg ? -6 : 6), bar.y); });
-  ctx.restore(); } };
+const kfmt = v => v == null ? '' : Math.abs(v) >= 1000 ? (v / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : fInt(v);
+const dataLabels = { id: 'dataLabels', afterDatasetsDraw(chart){
+  const { ctx, chartArea } = chart, t = theme(), horiz = chart.options.indexAxis === 'y';
+  const n = Math.max(1, chart.data.labels.length);
+  chart.data.datasets.forEach((ds, di) => {
+    const o = ds.dl; if (!o || !chart.isDatasetVisible(di)) return;
+    const meta = chart.getDatasetMeta(di), size = o.size || 10;
+    ctx.save(); ctx.font = `700 ${size}px Montserrat, Arial, sans-serif`; ctx.textBaseline = 'middle';
+    const texts = ds.data.map(v => v == null ? null : o.format(v));
+    const maxW = Math.max(0, ...texts.filter(Boolean).map(x => ctx.measureText(x).width));
+    const slot = (horiz ? chartArea.height : chartArea.width) / n / (o.slots || 1);
+    const step = horiz ? 1 : Math.max(1, Math.ceil((maxW + 6) / slot));
+    let lastI = -1; texts.forEach((x, i) => { if (x != null) lastI = i; });
+    meta.data.forEach((el, i) => {
+      const txt = texts[i]; if (txt == null || (lastI - i) % step !== 0) return;
+      const v = ds.data[i], w = ctx.measureText(txt).width;
+      let x, y;
+      if (horiz) { ctx.textAlign = v < 0 ? 'right' : 'left'; x = el.x + (v < 0 ? -6 : 6); y = el.y; }
+      else { ctx.textAlign = 'center'; x = el.x; y = (v < 0 && o.bar) ? el.y + 10 : el.y - (o.offset || 11); }
+      if (o.bg) {
+        const bx = x - w / 2 - 3;
+        ctx.fillStyle = alpha(t.surface, .9);
+        ctx.beginPath(); ctx.roundRect ? ctx.roundRect(bx, y - size / 2 - 2, w + 6, size + 4, 3) : ctx.rect(bx, y - size / 2 - 2, w + 6, size + 4); ctx.fill();
+      }
+      ctx.fillStyle = o.color || t.ink; ctx.fillText(txt, x, y);
+    });
+    ctx.restore();
+  });
+} };
 function draw(key, canvasId, config){
-  config.plugins = [endLabels];
+  config.plugins = [dataLabels];
+  if (config.options.indexAxis !== 'y') config.options.layout = { padding: { top: 20 } };
   if (charts[key]) { charts[key].data = config.data; charts[key].options = config.options; charts[key].update(); return; }
   charts[key] = new Chart(document.getElementById(canvasId), config);
 }
@@ -487,7 +499,6 @@ function currentHour(){
   const rows = DATA.tripsHour || [];
   let h = -1;
   rows.forEach(r => { const x = hourOf(r.hour_of_day); if (x != null && num(r.trips_today) > 0) h = Math.max(h, x); });
-  if (h < 0) (DATA.finance || []).forEach(r => { const x = hourOf(r.hour); if (x != null && num(r.net_revenue_today) > 0) h = Math.max(h, x); });
   return h < 0 ? +ammanTime(new Date()).slice(0, 2) : h;
 }
 
@@ -526,15 +537,6 @@ function renderTiles(){
     const p1 = pctChange(t, lw), p4 = pctChange(t, avg4);
     tile('tDemand', fInt(t),
       `<span class="${cls(p1)}">${fSign(p1, 1)}%</span> vs last week, <span class="${cls(p4)}">${fSign(p4, 1)}%</span> vs 4-week average`);
-  });
-  safe('c-rev', ['finance'], () => {
-    const rows = DATA.finance, h = currentHour();
-    const today = sum(rows, r => num(r.net_revenue_today));
-    const full = rows.filter(r => hourOf(r.hour) < h);
-    const a = sum(full, r => num(r.net_revenue_today)), b = sum(full, r => num(r.net_revenue_last_week));
-    const p = pctChange(a, b);
-    tile('tRev', `${fInt(today)}<small>JD</small>`,
-      h > 0 ? `<span class="${cls(p)}">${fSign(p, 1)}%</span> vs last week, full hours to ${hh(h)}` : 'Comparison starts after the first full hour');
   });
   safe('c-uns', ['unserved'], () => {
     const rows = DATA.unserved;
@@ -587,34 +589,12 @@ function renderTrips(){
       type: 'line',
       data: { labels: hours.map(hh), datasets: [
         { label: 'Today', data: today, borderColor: t.today, backgroundColor: alpha(t.today, .12), fill: true, tension: .3, pointRadius: 2, borderWidth: 2.5,
-          segment: { borderDash: c => c.p1DataIndex === h ? [3, 3] : undefined }, pointBackgroundColor: hours.map(x => x === h ? t.surface : t.today) },
+          segment: { borderDash: c => c.p1DataIndex === h ? [3, 3] : undefined }, pointBackgroundColor: hours.map(x => x === h ? t.surface : t.today),
+          dl: { format: kfmt, color: t.today, bg: true } },
         { label: 'Last week', data: last, borderColor: t.last, borderDash: [6, 4], pointRadius: 0, tension: .3, borderWidth: 2 }
       ] },
       options: baseOptions(t, { plugins: Object.assign(baseOptions(t).plugins, { tooltip: Object.assign(baseOptions(t).plugins.tooltip, {
         callbacks: { label: c => ` ${c.dataset.label}: ${fInt(c.parsed.y)}` } }) }) })
-    });
-  });
-}
-function renderRevenue(){
-  safe('c-revh', ['finance'], () => {
-    const t = theme(), h = currentHour();
-    const by = {}; DATA.finance.forEach(r => { const x = hourOf(r.hour); if (x != null) by[x] = r; });
-    const hours = [...Array(24).keys()];
-    let today = hours.map(x => x > h ? null : num(by[x] && by[x].net_revenue_today));
-    let last = hours.map(x => num(by[x] && by[x].net_revenue_last_week));
-    const cum = MODE.rev === 'cum';
-    if (cum) { today = cumulative(today, h); last = cumulative(last); }
-    const lwDay = sum(DATA.finance, r => num(r.net_revenue_last_week));
-    document.getElementById('revSub').textContent = `Last week’s same day closed at ${fInt(lwDay)} JD.`;
-    const opts = baseOptions(t);
-    opts.plugins.tooltip.callbacks = { label: c => ` ${c.dataset.label}: ${fDec(c.parsed.y, 0)} JD` };
-    draw('rev', 'chRev', {
-      type: 'bar',
-      data: { labels: hours.map(hh), datasets: [
-        { type: 'bar', label: 'Today', data: today, backgroundColor: hours.map(x => x === h ? alpha(t.today, .45) : t.today), borderRadius: 3, order: 2 },
-        { type: 'line', label: 'Last week', data: last, borderColor: t.last, borderDash: [6, 4], pointRadius: 0, tension: .3, borderWidth: 2, order: 1 }
-      ] },
-      options: opts
     });
   });
 }
@@ -634,8 +614,8 @@ function renderHealth(){
     draw('health', 'chHealth', {
       type: 'bar',
       data: { labels: hours.map(hh), datasets: [
-        { type: 'line', label: 'Completion rate', yAxisID: 'y1', data: hours.map(x => num(comp[x] && comp[x].completed_percentage)), borderColor: t.today, backgroundColor: t.today, tension: .3, pointRadius: 3, borderWidth: 2.5, order: 1 },
-        { type: 'bar', label: 'Unserved riders', yAxisID: 'y', data: hours.map(x => num(uns[x] && uns[x].unserved_riders)), backgroundColor: alpha(t.red, .7), borderRadius: 3, order: 2 }
+        { type: 'line', label: 'Completion rate', yAxisID: 'y1', data: hours.map(x => num(comp[x] && comp[x].completed_percentage)), borderColor: t.today, backgroundColor: t.today, tension: .3, pointRadius: 3, borderWidth: 2.5, order: 1, dl: { format: v => Math.round(v) + '%', color: t.today, bg: true } },
+        { type: 'bar', label: 'Unserved riders', yAxisID: 'y', data: hours.map(x => num(uns[x] && uns[x].unserved_riders)), backgroundColor: alpha(t.red, .7), borderRadius: 3, order: 2, dl: { format: fInt, color: t.red, bar: true, offset: 8 } }
       ] },
       options: opts
     });
@@ -653,8 +633,8 @@ function renderPromo(){
     draw('promo', 'chPromo', {
       type: 'bar',
       data: { labels: rows.map(r => hh(r.h)), datasets: [
-        { type: 'line', label: 'Share of trips with discount', yAxisID: 'y1', data: rows.map(r => r.pct), borderColor: t.orange, backgroundColor: t.orange, tension: .3, pointRadius: 3, borderWidth: 2, order: 1 },
-        { type: 'bar', label: 'Discount (JD)', yAxisID: 'y', data: rows.map(r => r.jd), backgroundColor: t.today, borderRadius: 3, order: 2 }
+        { type: 'line', label: 'Share of trips with discount', yAxisID: 'y1', data: rows.map(r => r.pct), borderColor: t.orange, backgroundColor: t.orange, tension: .3, pointRadius: 3, borderWidth: 2, order: 1, dl: { format: v => Math.round(v) + '%', color: t.orange, bg: true } },
+        { type: 'bar', label: 'Discount (JD)', yAxisID: 'y', data: rows.map(r => r.jd), backgroundColor: t.today, borderRadius: 3, order: 2, dl: { format: v => fInt(v), bar: true, offset: 8 } }
       ] },
       options: opts
     });
@@ -672,8 +652,8 @@ function renderUsers(){
     draw('users', 'chUsers', {
       type: 'bar',
       data: { labels: rows.map(r => hh(r.h)), datasets: [
-        { label: 'Today', data: rows.map(r => r.a), backgroundColor: rows.map(r => r.h === last ? alpha(t.today, .45) : t.today), borderRadius: 3 },
-        { label: 'Last week', data: rows.map(r => r.b), backgroundColor: alpha(t.last, .6), borderRadius: 3 }
+        { label: 'Today', data: rows.map(r => r.a), backgroundColor: rows.map(r => r.h === last ? alpha(t.today, .45) : t.today), borderRadius: 3, dl: { format: kfmt, slots: 2, bar: true, color: t.today } },
+        { label: 'Last week', data: rows.map(r => r.b), backgroundColor: alpha(t.last, .6), borderRadius: 3, dl: { format: kfmt, slots: 2, bar: true, color: t.muted } }
       ] },
       options: opts
     });
@@ -714,14 +694,13 @@ function renderMtd(){
     opts.scales.x = { grid: { color: t.line }, border: { display: false }, ticks: { color: t.muted, font: { size: 11 }, callback: v => v + '%' } };
     opts.scales.y = { grid: { display: false }, border: { color: t.line }, ticks: { color: t.ink, font: { size: 12, weight: 600 } } };
     opts.plugins.legend = { display: false };
-    opts.plugins.endLabels = { format: v => fSign(v, 1) + '%' };
     opts.layout = { padding: { right: 44 } };
     opts.plugins.tooltip.callbacks = { label: c => { const r = rows[c.dataIndex]; return [
       ` Growth: ${fSign(r.g, 1)}%`, ` This month: ${fInt(r.mtd)}`, ` Last month: ${fInt(r.lm)}`,
       ` Promo change: ${fSign(r.pjd)} JD (${fSign(r.pp, 1)}%)`]; } };
     draw('mtd', 'chMtd', {
       type: 'bar',
-      data: { labels: rows.map(r => r.z), datasets: [{ data: rows.map(r => r.g), backgroundColor: rows.map(r => r.g >= 0 ? t.green : t.red), borderRadius: 3, barThickness: 16 }] },
+      data: { labels: rows.map(r => r.z), datasets: [{ data: rows.map(r => r.g), backgroundColor: rows.map(r => r.g >= 0 ? t.green : t.red), borderRadius: 3, barThickness: 16, dl: { format: v => fSign(v, 1) + '%', size: 11 } }] },
       options: opts
     });
   });
@@ -752,10 +731,9 @@ function renderPrice(){
     opts.scales.x = { grid: { color: t.line }, border: { display: false }, beginAtZero: true, ticks: { color: t.muted, font: { size: 11 } } };
     opts.scales.y = { grid: { display: false }, border: { color: t.line }, ticks: { color: t.ink, font: { size: 12, weight: 600 } } };
     opts.plugins.legend = { display: false };
-    opts.plugins.endLabels = { format: v => fDec(v, 2) };
     opts.layout = { padding: { right: 36 } };
     opts.plugins.tooltip.callbacks = { label: c => ` ${fDec(c.parsed.x, 2)} JD` };
-    draw('price', 'chPrice', { type: 'bar', data: { labels: rows.map(r => r.z), datasets: [{ data: rows.map(r => r.v), backgroundColor: t.today, borderRadius: 3, barThickness: 16 }] }, options: opts });
+    draw('price', 'chPrice', { type: 'bar', data: { labels: rows.map(r => r.z), datasets: [{ data: rows.map(r => r.v), backgroundColor: t.today, borderRadius: 3, barThickness: 16, dl: { format: v => fDec(v, 2), size: 11 } }] }, options: opts });
   });
 }
 function renderSvc(){
@@ -793,36 +771,11 @@ function renderAmmanCmp(){
     draw('amman', 'chAmman', {
       type: 'line',
       data: { labels: shown.map(r => hh(r.h)), datasets: [
-        { type: 'line', label: 'Completion today', yAxisID: 'y', data: shown.map(r => r.a), borderColor: t.today, backgroundColor: t.today, tension: .3, pointRadius: 3, borderWidth: 2.5, order: 1 },
+        { type: 'line', label: 'Completion today', yAxisID: 'y', data: shown.map(r => r.a), borderColor: t.today, backgroundColor: t.today, tension: .3, pointRadius: 3, borderWidth: 2.5, order: 1, dl: { format: v => Math.round(v) + '%', color: t.today, bg: true } },
         { type: 'line', label: 'Completion last week', yAxisID: 'y', data: shown.map(r => r.b), borderColor: t.last, borderDash: [6, 4], pointRadius: 0, tension: .3, borderWidth: 2, order: 1 },
       ] },
       options: opts
     });
-  });
-}
-function renderAmmanHours(){
-  safe('c-ahours', ['ammanHours'], () => {
-    const t = theme();
-    const rows = DATA.ammanHours.map(r => ({
-      h: hourOf(r.hour_start), n: num(r.total_rides), cp: num(r.completed_percentage), cu: num(r.canceled_by_user_trips),
-      ac: num(r.avg_create_to_accept_completed_sec), ax: num(r.avg_create_to_accept_canceled_sec),
-      da: num(r.dispatch_acceptance_ratio_pct), dp: num(r.avg_drivers_per_trip)
-    })).filter(r => r.h != null).sort((a, b) => a.h - b.h);
-    const range = f => { const v = rows.map(r => r[f]).filter(x => x != null); return [Math.min(...v), Math.max(...v)]; };
-    const shade = (v, f, color) => {
-      if (v == null) return '';
-      const [lo, hi] = range(f); const a = hi === lo ? .15 : .08 + (v - lo) / (hi - lo) * .55;
-      return `style="background:${alpha(color, a.toFixed(2))};${a > .5 ? 'color:#fff;' : ''}"`;
-    };
-    document.getElementById('tblAmman').innerHTML =
-      `<thead><tr><th>Hour</th><th>Requests</th><th>Completion</th><th>Canceled by rider</th><th>Accept time, completed (s)</th><th>Accept time, canceled (s)</th><th>Dispatch acceptance</th><th>Drivers per trip</th></tr></thead>
-       <tbody>${rows.map(r => `<tr><td>${hh(r.h)}</td><td>${fInt(r.n)}</td>
-         <td class="heat" ${shade(r.cp, 'cp', t.today)}>${fDec(r.cp, 1)}%</td>
-         <td>${fInt(r.cu)}</td>
-         <td class="heat" ${shade(r.ac, 'ac', t.orange)}>${fDec(r.ac, 1)}</td>
-         <td class="heat" ${shade(r.ax, 'ax', t.orange)}>${fDec(r.ax, 1)}</td>
-         <td class="heat" ${shade(r.da, 'da', t.today)}>${fDec(r.da, 1)}%</td>
-         <td>${fDec(r.dp, 1)}</td></tr>`).join('')}</tbody>`;
   });
 }
 
@@ -841,7 +794,7 @@ function renderDemand(){
     draw('demand', 'chDemand', {
       type: 'bar',
       data: { labels: rows.map(r => r.d ? r.d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }) : r.l),
-        datasets: [{ data: rows.map(r => r.v), backgroundColor: rows.map(r => /today/i.test(r.l) ? t.orange : t.today), borderRadius: 3 }] },
+        datasets: [{ data: rows.map(r => r.v), backgroundColor: rows.map(r => /today/i.test(r.l) ? t.orange : t.today), borderRadius: 3, dl: { format: kfmt, bar: true, offset: 8 } }] },
       options: opts
     });
   });
@@ -861,7 +814,7 @@ function renderVisa(){
     draw('visa', 'chVisa', {
       type: 'bar',
       data: { labels: rows.map(r => r.date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })),
-        datasets: [{ data: rows.map(r => r.v), backgroundColor: rows.map(color), borderRadius: 2 }] },
+        datasets: [{ data: rows.map(r => r.v), backgroundColor: rows.map(color), borderRadius: 2, dl: { format: kfmt, bar: true, offset: 8, size: 9 } }] },
       options: opts
     });
   });
@@ -873,8 +826,8 @@ function renderAll(){
     Chart.defaults.font.family = 'Montserrat, "Segoe UI", Arial, sans-serif';
     Chart.defaults.color = theme().muted;
   }
-  [renderHero, renderTiles, renderTrips, renderRevenue, renderHealth, renderPromo, renderUsers,
-   renderZoneSame, renderMtd, renderZoneHealth, renderPrice, renderSvc, renderAmmanCmp, renderAmmanHours, renderDemand, renderVisa]
+  [renderHero, renderTiles, renderTrips, renderHealth, renderPromo, renderUsers,
+   renderZoneSame, renderMtd, renderZoneHealth, renderPrice, renderSvc, renderAmmanCmp, renderDemand, renderVisa]
     .forEach(fn => { try { fn(); } catch (e) { console.error(fn.name, e); } });
 }
 
@@ -882,7 +835,7 @@ document.querySelectorAll('.seg').forEach(seg => seg.addEventListener('click', e
   const b = e.target.closest('button'); if (!b) return;
   seg.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
   MODE[seg.dataset.chart] = b.dataset.mode;
-  seg.dataset.chart === 'trips' ? renderTrips() : renderRevenue();
+  renderTrips();
 }));
 document.getElementById('hideZero').addEventListener('change', renderZoneSame);
 document.getElementById('svcZone').addEventListener('change', renderSvc);
