@@ -198,7 +198,7 @@ footer li.bad{color:var(--red)}
         <div class="msg"></div><div class="chart"><canvas id="chHealth"></canvas></div>
       </div>
       <div class="card" id="c-promoh" data-src="promoHour">
-        <div class="card-head"><div><h3>Promo discount by hour<span class="stale">Stale</span></h3><p class="sub">Bars are JD discounted, the line is the share of completed trips with a discount.</p></div></div>
+        <div class="card-head"><div><h3>Promo discount by hour<span class="stale">Stale</span></h3><p class="sub">Bars are JD discounted. Orange is the share of completed trips with a discount, red is promo as a % of commission.</p></div></div>
         <div class="msg"></div><div class="chart"><canvas id="chPromo"></canvas></div>
       </div>
       <div class="card span2" id="c-users" data-src="zonesHours">
@@ -297,6 +297,8 @@ const SOURCES = {
   zoneSame:   { id: 'bc7eb357-8b8b-4ea2-ba72-d47134cf8a42', name: 'Completed Trips By Zone - Same Time Comparison' }
 };
 
+const PROMO_BURN_ID = '10d4c555-57f6-41fe-a3fb-19e179e33074';
+if (/^[0-9a-f-]{36}$/.test(PROMO_BURN_ID)) SOURCES.promoBurn = { id: PROMO_BURN_ID, name: 'Promo vs Commission - Today vs Last Week' };
 const DATA = {}, STATUS = {}, charts = {};
 const MODE = { trips: 'hourly' };
 let loading = false, nextAt = Date.now() + REFRESH_MS;
@@ -503,6 +505,23 @@ function currentHour(){
   return h < 0 ? +ammanTime(new Date()).slice(0, 2) : h;
 }
 
+function burn(){
+  const rows = DATA.promoBurn; if (!rows || !rows.length) return null;
+  const acc = () => ({ promo: 0, comm: 0 });
+  const out = { today: acc(), last: acc(), hour: {}, zone: {} };
+  rows.forEach(r => {
+    const per = String(r.period || '').toLowerCase() === 'today' ? 'today' : 'last';
+    const pr = num(r.promo_jd) || 0, cm = num(r.commission_jd) || 0;
+    const h = hourOf(r.hour_local), z = zoneKey(r.zone);
+    out[per].promo += pr; out[per].comm += cm;
+    if (per === 'today' && h != null) { out.hour[h] = out.hour[h] || acc(); out.hour[h].promo += pr; out.hour[h].comm += cm; }
+    out.zone[z] = out.zone[z] || { today: acc(), last: acc() };
+    out.zone[z][per].promo += pr; out.zone[z][per].comm += cm;
+  });
+  return out;
+}
+const ratio = a => a && a.comm ? a.promo / a.comm * 100 : null;
+
 /* ---------- TODAY ---------- */
 function renderHero(){
   safe('c-hero', ['zoneSame'], () => {
@@ -550,7 +569,12 @@ function renderTiles(){
     const jd = sum(rows, r => num(r.promo_with_discount_jd));
     const trips = sum(rows, r => num(r.completed_trips));
     const share = trips ? sum(rows, r => num(r.completed_trips) * num(r.promo_with_discount_percentage)) / trips : null;
-    tile('tPromo', `${fInt(jd)}<small>JD</small>`, `${fDec(share, 1)}% of completed trips had a discount`);
+    const b = burn(); let extra = '';
+    if (b) {
+      const rt = ratio(b.today), rl = ratio(b.last), d = rt != null && rl != null ? rt - rl : null;
+      extra = `<br>Promo is <b>${fDec(rt, 1)}%</b> of commission, <span class="${cls(d, false)}">${fSign(d, 1)} pts</span> vs last week (${fDec(rl, 1)}%)`;
+    }
+    tile('tPromo', `${fInt(jd)}<small>JD</small>`, `${fDec(share, 1)}% of completed trips had a discount${extra}`);
   });
   safe('c-visa', ['visa'], () => {
     const rows = visaRows();
@@ -630,12 +654,16 @@ function renderPromo(){
     const opts = baseOptions(t);
     opts.scales.y.title = { display: true, text: 'JD', color: t.muted, font: { size: 11, weight: 600 } };
     opts.scales.y1 = { position: 'right', min: 0, suggestedMax: 40, grid: { display: false }, border: { display: false }, ticks: { color: t.muted, font: { size: 11 }, callback: v => v + '%' } };
-    opts.plugins.tooltip.callbacks = { label: c => c.dataset.yAxisID === 'y1' ? ` Trips with discount: ${fDec(c.parsed.y, 1)}%` : ` Discount: ${fDec(c.parsed.y, 0)} JD on ${fInt(rows[c.dataIndex].n)} trips` };
+    const b = burn();
+    opts.plugins.tooltip.callbacks = { label: c => c.dataset.key === 'burn' ? ` Promo ÷ commission: ${fDec(c.parsed.y, 1)}%`
+      : c.dataset.yAxisID === 'y1' ? ` Trips with discount: ${fDec(c.parsed.y, 1)}%` : ` Discount: ${fDec(c.parsed.y, 0)} JD on ${fInt(rows[c.dataIndex].n)} trips` };
+    const extra = b ? [{ type: 'line', key: 'burn', label: 'Promo ÷ commission', yAxisID: 'y1', data: rows.map(r => ratio(b.hour[r.h])), borderColor: t.red, backgroundColor: t.red, tension: .3, pointRadius: 3, borderWidth: 2, order: 0, dl: { format: v => Math.round(v) + '%', color: t.red, bg: true } }] : [];
     draw('promo', 'chPromo', {
       type: 'bar',
       data: { labels: rows.map(r => hh(r.h)), datasets: [
         { type: 'line', label: 'Share of trips with discount', yAxisID: 'y1', data: rows.map(r => r.pct), borderColor: t.orange, backgroundColor: t.orange, tension: .3, pointRadius: 3, borderWidth: 2, order: 1, dl: { format: v => Math.round(v) + '%', color: t.orange, bg: true } },
-        { type: 'bar', label: 'Discount (JD)', yAxisID: 'y', data: rows.map(r => r.jd), backgroundColor: t.today, borderRadius: 3, order: 2, dl: { format: v => fInt(v), bar: true, offset: 8 } }
+        { type: 'bar', label: 'Discount (JD)', yAxisID: 'y', data: rows.map(r => r.jd), backgroundColor: t.today, borderRadius: 3, order: 2, dl: { format: v => fInt(v), bar: true, offset: 8 } },
+        ...extra
       ] },
       options: opts
     });
@@ -709,19 +737,23 @@ function renderMtd(){
 function renderZoneHealth(){
   safe('c-zhealth', ['zoneCmp'], () => {
     const rows = DATA.zoneCmp.map(r => ({
-      z: zoneName(r.zone), ct: num(r.completed_pct_today), cl: num(r.completed_pct_last_week),
+      z: zoneName(r.zone), raw: r.zone, ct: num(r.completed_pct_today), cl: num(r.completed_pct_last_week),
       d: num(r.completed_trips_difference_count), u: num(r.n_of_unique_users_difference_count), p: num(r.promo_code_difference_pct)
     })).filter(r => r.ct || r.cl || r.d);
     const pp = r => (r.ct == null || r.cl == null) ? null : r.ct - r.cl;
+    const b = burn();
+    const burnCell = r => { if (!b) return ''; const z = b.zone[zoneKey(r.raw)];
+      const a = z ? ratio(z.today) : null, l = z ? ratio(z.last) : null, d = a != null && l != null ? a - l : null;
+      return `<td>${a == null ? '—' : fDec(a, 1) + '%'} <span class="${cls(d, false)}" style="font-size:11px">${d == null ? '' : fSign(d, 1)}</span></td>`; };
     document.getElementById('tblZHealth').innerHTML =
-      `<thead><tr><th>Zone</th><th>Completion today</th><th>Last week</th><th>Change (pts)</th><th>Completed trips</th><th>Unique riders</th><th>Promo trips %</th></tr></thead>
+      `<thead><tr><th>Zone</th><th>Completion today</th><th>Last week</th><th>Change (pts)</th><th>Completed trips</th><th>Unique riders</th><th>Promo trips %</th>${b ? '<th>Promo ÷ commission (pts vs LW)</th>' : ''}</tr></thead>
        <tbody>${rows.map(r => `<tr><td>${esc(r.z)}</td>
          <td><span class="pill ${rateClass(r.ct)}">${fDec(r.ct, 1)}%</span></td>
          <td class="muted">${fDec(r.cl, 1)}%</td>
          <td class="${cls(pp(r))}">${fSign(pp(r), 1)}</td>
          <td class="${cls(r.d)}">${fSign(r.d)}</td>
          <td class="${cls(r.u)}">${fSign(r.u)}</td>
-         <td>${fSign(r.p, 1)}%</td></tr>`).join('')}</tbody>`;
+         <td>${fSign(r.p, 1)}%</td>${burnCell(r)}</tr>`).join('')}</tbody>`;
   });
 }
 function renderPrice(){
