@@ -10,7 +10,8 @@ const ALLOWED = new Set([
   '7d9b3c18-3be0-4862-afed-c85307f62673',
   'ea279495-ea79-4802-a43c-7cfec8350eb5',
   '9126c381-ae08-4f31-bc4a-cb97ab65aa33',
-  'bc7eb357-8b8b-4ea2-ba72-d47134cf8a42'
+  'bc7eb357-8b8b-4ea2-ba72-d47134cf8a42',
+  '10d4c555-57f6-41fe-a3fb-19e179e33074'
 ]);
 
 export async function onRequestGet({ params }) {
